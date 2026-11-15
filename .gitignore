@@ -7,12 +7,16 @@ out/
 .next/
 *.tsbuildinfo
 
-# Tooling caches
+# Tooling caches (.cache holds the downloaded MediaPipe model)
+.cache/
 .turbo/
 coverage/
 .eslintcache
 
 # Test artifacts
+packages/face/spike/public/
+packages/face/.test-assets/
+packages/face/.e2e-site/
 .vitest/
 .roundtrip/
 playwright-report/

@@ -12,12 +12,27 @@ export default defineConfig([
     '**/.next/**',
     '**/out/**',
     'python/**',
+    '**/spike/public/**',
+    '**/.test-assets/**',
+    '**/.e2e-site/**',
+    '**/e2e/fixtures/**',
   ]),
   js.configs.recommended,
   {
     // Repo scripts run in Node.
-    files: ['scripts/**/*.mjs'],
-    languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
+    files: ['**/scripts/**/*.mjs', '**/spike/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        Buffer: 'readonly',
+        fetch: 'readonly',
+        window: 'readonly',
+        document: 'readonly',
+        btoa: 'readonly',
+        URL: 'readonly',
+      },
+    },
   },
   {
     files: ['**/*.ts', '**/*.tsx'],

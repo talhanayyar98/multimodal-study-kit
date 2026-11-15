@@ -1,6 +1,6 @@
 # PLAN — multimodal-study-kit (working name)
 
-> Status: **M1 done**, 2026-11-15 (see [§11 M1](#m1--core-and-simple-sensors) for what shipped and how it differs from this plan). Decisions on Q1, Q2, Q4 and Q6 are recorded in [§12](#12-open-questions); Q3, Q5, Q7 and Q8 are due before M2.
+> Status: **M2 nearly done**, 2026-11-15. The face sensor is built and tested; the head-pose sign check and the face-detection e2e wait for the recorded clip (Q5). See [§11 M2](#m2--face-sensor). Every open question in [§12](#12-open-questions) is decided.
 > This plan covers architecture, the public API (what a researcher's code looks like), the refined milestones, risks, and the questions that need answers before M1.
 > Everything marked _verified_ was checked against current packages or docs on 2026-11-15 (see [§13 Verification log](#13-verification-log)). Everything else is a design proposal.
 
@@ -57,18 +57,18 @@ Most of the brief stands. These are the changes I'm proposing, roughly in order 
 
 ### 2.1 Packages
 
-| Path                | npm / PyPI name¹      | Contents                                                                                                                                                                                             | Runtime deps                           |
-| ------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| `packages/core`     | `@mmstudykit/core`    | Session lifecycle, clock, stream registry, markers, consent model and enforcement, recorder (memory → IndexedDB), resume, manifest, CSV/JSONL encoders, sinks (download zip, HTTP), sensor interface | `fflate` (zip, ~8 kB gz, tree-shaken)  |
-| `packages/sensors`  | `@mmstudykit/sensors` | `pointer`, `keyboard`, `page` sensors via subpath exports (`@mmstudykit/sensors/pointer`, …)                                                                                                         | none (peer: core)                      |
-| `packages/face`     | `@mmstudykit/face`    | Face sensor on MediaPipe FaceLandmarker, worker and main-thread pipelines, feature extractors, quality metrics, asset helper                                                                         | `@mediapipe/tasks-vision` (peer: core) |
-| `packages/react`    | `@mmstudykit/react`   | `StudySessionProvider`, `useStudySession`, `useSensorQuality`, `<ConsentGate>`, `<CameraCheck>`, `<SensorStatus>`, `<PauseControls>`                                                                 | none (peers: react, core)              |
-| `packages/jspsych`  | `@mmstudykit/jspsych` | jsPsych 8 extension, consent trial, ESM plus IIFE/CDN build                                                                                                                                          | none (peers: jspsych, core)            |
-| `python/mmstudykit` | `mmstudykit` (PyPI)   | `load_session`, `align`, `epochs`, typed                                                                                                                                                             | `pandas`, `numpy`                      |
-| `apps/demo`         | private               | Next.js demo study and researcher view (static export)                                                                                                                                               | next, react                            |
-| `apps/receiver`     | private               | Reference upload receiver that implements `spec/upload-protocol.md`                                                                                                                                  | express                                |
-| `spec/`             | n/a                   | Bundle format spec, JSON Schema, upload protocol, **shared conformance fixtures** used by both TS and Python tests                                                                                   | n/a                                    |
-| `docs/`             | n/a                   | Docs site (M5)                                                                                                                                                                                       | n/a                                    |
+| Path                | npm / PyPI name¹      | Contents                                                                                                                                                                                             | Runtime deps                                                                              |
+| ------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `packages/core`     | `@mmstudykit/core`    | Session lifecycle, clock, stream registry, markers, consent model and enforcement, recorder (memory → IndexedDB), resume, manifest, CSV/JSONL encoders, sinks (download zip, HTTP), sensor interface | `fflate` (zip, ~8 kB gz, tree-shaken)                                                     |
+| `packages/sensors`  | `@mmstudykit/sensors` | `pointer`, `keyboard`, `page` sensors via subpath exports (`@mmstudykit/sensors/pointer`, …)                                                                                                         | none (peer: core)                                                                         |
+| `packages/face`     | `@mmstudykit/face`    | Face sensor on MediaPipe FaceLandmarker, worker and main-thread pipelines, feature extractors, quality metrics, asset helper                                                                         | `@mediapipe/tasks-vision` exactly 1.2.3, bundled into the self-hosted assets (peer: core) |
+| `packages/react`    | `@mmstudykit/react`   | `StudySessionProvider`, `useStudySession`, `useSensorQuality`, `<ConsentGate>`, `<CameraCheck>`, `<SensorStatus>`, `<PauseControls>`                                                                 | none (peers: react, core)                                                                 |
+| `packages/jspsych`  | `@mmstudykit/jspsych` | jsPsych 8 extension, consent trial, ESM plus IIFE/CDN build                                                                                                                                          | none (peers: jspsych, core)                                                               |
+| `python/mmstudykit` | `mmstudykit` (PyPI)   | `load_session`, `align`, `epochs`, typed                                                                                                                                                             | `pandas`, `numpy`                                                                         |
+| `apps/demo`         | private               | Next.js demo study and researcher view (static export)                                                                                                                                               | next, react                                                                               |
+| `apps/receiver`     | private               | Reference upload receiver that implements `spec/upload-protocol.md`                                                                                                                                  | express                                                                                   |
+| `spec/`             | n/a                   | Bundle format spec, JSON Schema, upload protocol, **shared conformance fixtures** used by both TS and Python tests                                                                                   | n/a                                                                                       |
+| `docs/`             | n/a                   | Docs site (M5)                                                                                                                                                                                       | n/a                                                                                       |
 
 ¹ Confirmed 2026-11-15: the npm scope `@mmstudykit` and the PyPI name `mmstudykit` are both unclaimed. → [Q1](#12-open-questions)
 
@@ -447,6 +447,25 @@ Streams already carry what XDF stream headers need: name, type, channel labels a
 
 **Metrics endpoint.** See [§0.1](#0-where-this-plan-departs-from-the-brief) and [Q3](#12-open-questions).
 
+### 7.1 As built (M2)
+
+User-facing details are in [docs/face.md](docs/face.md); the measurements are in [docs/face-worker.md](docs/face-worker.md).
+
+- **Engine location.** A classic worker with the standard wasm loader is the default. The spike showed module workers need the `_module_` wasm (otherwise `ModuleFactory not set`), and main thread, classic and module (with the `_module_` wasm) all run in Chromium, Firefox and WebKit. The main thread is the fallback. The CPU delegate is the default: GPU loses headless everywhere, and real-GPU numbers are pending (`spike --headed`).
+- **MediaPipe never enters the app bundle.** The engine (MediaPipe + extractors + egress guard) is pre-bundled with esbuild into `mmsk-face-worker.js` (IIFE) and `mmsk-face-engine.js` (ESM). Both are served from the self-hosted assets folder and loaded only at `start()`, i.e. after consent. The sensor code in the app is small and needs no bundler configuration.
+- **Assets.** `mmstudykit-face copy-assets <dir>` writes the bundles, the matching wasm from the installed `@mediapipe/tasks-vision` (and refuses a version mismatch), and the model, checked against its pinned SHA-256. It also writes an integrity manifest. The engine verifies the model's SHA-256 again in the browser when WebCrypto is available. **The model isn't vendored**: no licence statement could be extracted from the model cards (`.task` contains none), so it's downloaded on the researcher's machine or CI instead. Participants never contact Google either way. Revisit if the Apache-2.0 status is confirmed.
+- **Egress.** In the worker, `fetch` only reaches the model and wasm URLs, `importScripts` only the loader, and `XMLHttpRequest`/`WebSocket`/`EventSource` are disabled. On the main-thread fallback, only `odml.pa.googleapis.com` is denied. Blocked attempts are counted in the manifest.
+- **Streams.** A new `face.frames` stream has one row per processed frame, with or without a face: `t_processed`, `face`, `inference_ms`, `brightness` and the timing source. "No face" and "not processed" are therefore distinguishable, and the feature streams only have rows for frames with a face.
+- **Iris features** are computed in pixel space and are rotation-invariant: position along the eye-corner axis, offset from it, and lid openness. The thesis prototype computed them in normalized coordinates, which are anisotropic for 4:3 frames.
+- **Head pose:** R = R_y·R_x·R_z. The matrix storage order is detected from the data (the translation's position), because the `Matrix` type only says "flattened". The **sign convention is not yet verified**: that needs the recorded clip.
+- **Lessons from the thesis prototype.** It was read only; nothing was copied.
+  - One serial engine queue, because the wasm aborts on concurrent init or on `close()` during a detect.
+  - 2D-canvas normalization of frames, because Continuity Camera frames crashed the importer.
+  - Strictly increasing timestamps.
+  - Rebuild once with the other delegate after an abort.
+  - TFLite `INFO:` and glog lines are filtered in the worker scope only; the host page's console is never patched.
+- **Camera.** Only the delivered width, height and frame rate are recorded. `getSettings()` also returns `deviceId`/`groupId`, which are dropped. The camera is released on `pause()` and reopened on `resume()`.
+
 ---
 
 ## 8. Browser support (expected; confirmed in M2 / M5)
@@ -487,27 +506,28 @@ CI notes:
 
 All versions were checked on npm and PyPI on 2026-11-15. Each runtime dependency is justified here, and any new one also goes in its commit message.
 
-| Tool / dep                                 | Version                  | Why                                                                                                         |
-| ------------------------------------------ | ------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| Node                                       | 24 LTS                   | Vitest 5 needs ^22.12 or ^24; ESLint 10 needs ≥ 20.19                                                       |
-| pnpm (workspaces, catalogs)                | 12.21.0                  | Workspace linking; `catalog:` keeps dev-tool versions in one place                                          |
-| Turborepo                                  | 2.11                     | Task graph + caching (brief). At five packages, `pnpm -r` would also do; Turbo earns its keep in CI caching |
-| TypeScript                                 | **6.0.3**                | Not 7.0: typescript-eslint peer range is `<6.1.0` (§0.12)                                                   |
-| ESLint + typescript-eslint + @eslint/js    | 10.15 / 8.72 / 10.0      | Type-aware linting (flat config)                                                                            |
-| eslint-config-prettier, Prettier           | 10.1 / 3.10              | Formatting owned by Prettier                                                                                |
-| Vitest + Vite                              | 5.1 / 8.3                | Unit tests; Vite is a required peer of Vitest 5                                                             |
-| ajv (dev)                                  | 8.20                     | Validate fixtures/manifests against the JSON Schema in tests                                                |
-| fflate (core, M1)                          | 0.8.3                    | Streaming zip; small, MIT, tree-shakable. Entry mtime pinned (see §13)                                      |
-| IndexedDB wrapper                          | none                     | ~100-line internal wrapper; we need few operations. (`idb` is the fallback if this grows)                   |
-| @mediapipe/tasks-vision (face, M2)         | 1.2.x                    | FaceLandmarker (Apache-2.0); see Q3 re version                                                              |
-| Playwright + @vitest/browser-playwright    | 1.65.1 / 5.1.0           | Vitest browser mode on Chromium/Firefox/WebKit with trusted input (M1); example e2e (M1); fake camera (M2)  |
-| Next.js / React (demo, peers)              | 16.4 / 19.3              | Demo app (brief); static export so it can be hosted like a real study                                       |
-| Express (receiver, M3)                     | 5.x                      | Familiar, readable reference server                                                                         |
-| uPlot (demo researcher view, M4)           | tbd                      | Fast canvas time-series plots for ~10⁵–10⁶ points; MIT, ~50 kB. Final pick in M4                            |
-| Changesets (M5)                            | 3.0                      | Versioning/changelogs (brief)                                                                               |
-| Python: numpy, pandas / hatchling / pytest | ≥1.26, ≥2.2 / 1.33 / 9.x | Loader; `requires-python >= 3.11` (3.10 reached end-of-life in Oct 2026)                                    |
-| Python dev: mypy, pandas-stubs             | 2.4 / 3.1                | `mypy --strict` over the loader and tests (§9)                                                              |
-| Library build                              | `tsc`                    | Enough for ESM + `.d.ts` now. Re-evaluate in M2 (worker bundling) and M4 (IIFE): `tsdown`/`tsup` or esbuild |
+| Tool / dep                                 | Version                  | Why                                                                                                                                                    |
+| ------------------------------------------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Node                                       | 24 LTS                   | Vitest 5 needs ^22.12 or ^24; ESLint 10 needs ≥ 20.19                                                                                                  |
+| pnpm (workspaces, catalogs)                | 12.21.0                  | Workspace linking; `catalog:` keeps dev-tool versions in one place                                                                                     |
+| Turborepo                                  | 2.11                     | Task graph + caching (brief). At five packages, `pnpm -r` would also do; Turbo earns its keep in CI caching                                            |
+| TypeScript                                 | **6.0.3**                | Not 7.0: typescript-eslint peer range is `<6.1.0` (§0.12)                                                                                              |
+| ESLint + typescript-eslint + @eslint/js    | 10.15 / 8.72 / 10.0      | Type-aware linting (flat config)                                                                                                                       |
+| eslint-config-prettier, Prettier           | 10.1 / 3.10              | Formatting owned by Prettier                                                                                                                           |
+| Vitest + Vite                              | 5.1 / 8.3                | Unit tests; Vite is a required peer of Vitest 5                                                                                                        |
+| ajv (dev)                                  | 8.20                     | Validate fixtures/manifests against the JSON Schema in tests                                                                                           |
+| fflate (core, M1)                          | 0.8.3                    | Streaming zip; small, MIT, tree-shakable. Entry mtime pinned (see §13)                                                                                 |
+| @mediapipe/tasks-vision (face, M2)         | **1.2.3 exact**          | FaceLandmarker (Apache-2.0). Exact pin: the metrics audit (Q3) applies to this build; re-audit on any bump                                             |
+| esbuild (face, dev, M2)                    | 0.28.2                   | Bundles the engine into self-hostable worker/ESM assets and the CLI (MIT). pnpm keeps its install script blocked; the platform binary works without it |
+| IndexedDB wrapper                          | none                     | ~100-line internal wrapper; we need few operations. (`idb` is the fallback if this grows)                                                              |
+| Playwright + @vitest/browser-playwright    | 1.65.1 / 5.1.0           | Vitest browser mode on Chromium/Firefox/WebKit with trusted input (M1); example e2e (M1); fake camera (M2)                                             |
+| Next.js / React (demo, peers)              | 16.4 / 19.3              | Demo app (brief); static export so it can be hosted like a real study                                                                                  |
+| Express (receiver, M3)                     | 5.x                      | Familiar, readable reference server                                                                                                                    |
+| uPlot (demo researcher view, M4)           | tbd                      | Fast canvas time-series plots for ~10⁵–10⁶ points; MIT, ~50 kB. Final pick in M4                                                                       |
+| Changesets (M5)                            | 3.0                      | Versioning/changelogs (brief)                                                                                                                          |
+| Python: numpy, pandas / hatchling / pytest | ≥1.26, ≥2.2 / 1.33 / 9.x | Loader; `requires-python >= 3.11` (3.10 reached end-of-life in Oct 2026)                                                                               |
+| Python dev: mypy, pandas-stubs             | 2.4 / 3.1                | `mypy --strict` over the loader and tests (§9)                                                                                                         |
+| Library build                              | `tsc`                    | Enough for ESM + `.d.ts` now. Re-evaluate in M2 (worker bundling) and M4 (IIFE): `tsdown`/`tsup` or esbuild                                            |
 
 No GPL or AGPL dependencies (WebGazer is GPL and is not used). M5 adds a CI licence check.
 
@@ -575,6 +595,29 @@ Known limitations, carried forward:
 
 **Done when:** CI runs the face pipeline on a checked-in clip and proves no image data and no unexpected origins.
 
+**Status (2026-11-15): everything except the clip-dependent parts.** Done:
+
+- worker spike and decision ([docs/face-worker.md](docs/face-worker.md))
+- egress guards
+- `copy-assets` with integrity checks
+- extractors (math unit-tested, including both matrix layouts and anisotropic frames)
+- rVFC timing with fallback
+- `face.frames` and `face.quality`
+- landmarks opt-in, and the camera released on pause
+- the privacy e2e: real camera path (Chrome fake device, Firefox fake streams), strict CSP, network and storage scans, decompressed-bundle scan, negative controls
+- the MJPEG fixture converter, which uses installed Chrome, so no ffmpeg is needed
+
+Tests: face 51 (33 Node, 15 browser across 3 engines, 3 e2e).
+
+**Waiting for the clip:**
+
+- convert it with `node packages/face/scripts/make-face-fixture.mjs <video>` and check it in
+- the e2e then asserts face detection automatically (face-present ratio, blendshape rows)
+- verify the head-pose sign convention against the recorded turns and document it in docs/face.md
+- spike numbers with a face present
+
+Main-thread overhead numbers move to M5 benchmarks.
+
 ### M3 — Consent UI, React and demo
 
 - Consent UI pieces and the consent record (text hash, version, per-sensor decisions, opt-ins).
@@ -606,34 +649,37 @@ Decided 2026-11-15:
 
 1. **Name and scope: keep `@mmstudykit/*` (npm) and `mmstudykit` (PyPI).** Checked on 2026-11-15: `registry.npmjs.org/-/org/mmstudykit/user` returns `Scope not found` (the same endpoint returns 200 for existing user and org scopes), there are no packages under the scope, and `pypi.org/pypi/mmstudykit/json` returns 404. _Action for the maintainer:_ create the free npm org `mmstudykit` so the scope can't be taken before the first publish. PyPI can't reserve a name without an upload, so that waits for M5.
 2. **License: Apache-2.0.** No longer provisional. _Action for the maintainer:_ check the university's IP policy before the repo goes public.
-3. _Open, due before M2:_ **MediaPipe metrics.**
-   - (a) _(recommended)_ Use 1.2.x, block in the worker plus CSP, and enforce it with the e2e test.
-   - (b) Pin `0.10.35`, which has no logger but gets no future fixes.
-   - (c) Allow it and add a line to the consent disclosure.
+3. **MediaPipe metrics: block them** (decided 2026-11-15). Use 1.2.x. Re-checked on 2026-11-15: 1.2.3 (latest) and the 1.2.4 nightly both still create the metrics logger unconditionally for every task. `enableLogging` appears in `vision.d.ts` but doesn't exist in the bundle at runtime. The logger sends with the global `fetch` and disables itself after the first failed send. The face worker's `fetch` only allows the configured asset URLs. The main-thread fallback denies only the metrics endpoint, so the host app's own `fetch` is untouched. The docs give a CSP `connect-src`, and the privacy e2e asserts that no request goes to an unexpected origin.
 4. **Package consolidation: accepted.** One `@mmstudykit/sensors` package with subpath exports. The consent model and its enforcement live in `core`; the consent UI ships with `react` and `jspsych`.
-5. _Open, due before M2:_ **Test video.** Can you record a 5–10 s clip of your own face (a few head turns, a smile, a blink, a moment out of frame) and agree to it being public in the repo? Otherwise I'll look for CC0 or CC-BY footage with a clear release.
+5. **Test video: the maintainer records their own clip** (decided 2026-11-15) and agrees to it being public in the repo. Until it exists, the pipeline is tested with synthetic frames and result fixtures, and the CI face e2e and head-pose convention check wait for it.
 6. **First real deployment: the maintainer's own Next.js/React app.** The milestone order stays as it is: React and the demo in M3, jsPsych in M4.
-7. _Open, due before M2:_ **Mobile.** Is face sensing on phones in scope for v0.1, or desktop/laptop (plus iPad) first?
-8. _Open, due before M2:_ **Thesis repo.** If you'd like me to look at your earlier FaceMesh + iris implementation for lessons learned, what's the path?
+7. **Mobile: desktop + iPad first** (decided 2026-11-15). The target is the last two major versions of Chrome, Edge and Firefox, plus Safari ≥ 17 on macOS and iPadOS. Phones are best-effort: documented, not tested in CI.
+8. **Thesis repo: reviewed for lessons learned** (decided 2026-11-15). It was read only; nothing is copied verbatim. What carried over is noted in [§7](#7-face-sensor-plan).
 
 ---
 
 ## 13. Verification log
 
-| Claim                                                                                                                           | Source (checked 2026-11-15)                                                                                                                                    |
-| ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| MediaPipe 1.x metrics POST to `odml.pa.googleapis.com/v1/log` every 60 s, no option to disable; stops after first failed send   | `@mediapipe/tasks-vision@1.2.3` `vision_bundle.mjs` + README "Privacy Notice" (last modified 2026-06-05); absent in `0.10.35`, present since `1.0.0`           |
-| FaceLandmarker options, `detectForVideo`, result types, blendshape mirroring note, `useModule` loader, module-worker fallback   | `@mediapipe/tasks-vision@1.2.3` `vision.d.ts` and bundle                                                                                                       |
-| jsPsych extension interface                                                                                                     | `jspsych@8.4.0` `dist/index.d.ts`                                                                                                                              |
-| rVFC support (Chrome 83, Safari 15.4, Firefox 132); `captureTime` optional/WebRTC-oriented                                      | web.dev rVFC article; MDN; Mozilla bug 1908245                                                                                                                 |
-| `performance.now()` coarsening (Chrome 100 µs / 5 µs isolated; Firefox, Safari ~1 ms)                                           | Chrome developer blog "Aligning timers with cross origin isolation restrictions"; MDN `Performance.now()`                                                      |
-| `getCoalescedEvents` in Safari 18.2+                                                                                            | MDN compat data; WebKit bug 210454                                                                                                                             |
-| Chrome fake capture accepts `.y4m` and `.mjpeg`                                                                                 | Chromium `media_switches.cc`; WebdriverIO camera service docs                                                                                                  |
-| typescript-eslint peer `typescript >=4.8.4 <6.1.0`; TS 7.0 stable, 7.1 beta                                                     | `npm view typescript-eslint@8.72.2 peerDependencies`; npm dist-tags; TypeScript 7.0 announcement                                                               |
-| Vitest 5 requires Node ^22.12/^24 and Vite (non-optional peer)                                                                  | `npm view vitest@5.1.0 engines peerDependencies peerDependenciesMeta`                                                                                          |
-| pandas 3.1 requires Python ≥ 3.11; numpy 2.5 ≥ 3.12                                                                             | PyPI JSON API                                                                                                                                                  |
-| Unloading a document force-closes its IndexedDB connections, aborting unfinished transactions                                   | IndexedDB 3.0 "close a database connection" (forced flag); reproduced by the M1 e2e test before the spill fix                                                  |
-| fflate builds zip DOS timestamps from `new Date(mtime ?? Date.now())` with local-time getters                                   | `fflate@0.8.3` `esm/browser.js` (`getFullYear() - 1980` …)                                                                                                     |
-| Vitest 5 browser mode: `browser: { enabled, provider: playwright(), instances }`, `test.projects`; `vitest/browser` `userEvent` | `vitest@5.1.0` and `@vitest/browser@5.1.0` type definitions; Playwright 1.65.1 browsers (Chromium 159, Firefox 159, WebKit 27.2)                               |
-| pandas reads `0`/`1` into nullable `boolean` via `Int64`; `keep_default_na=False, na_values=['']` keeps `"NA"` a string         | pandas 3.1.1, exercised by `python/mmstudykit/tests`                                                                                                           |
-| EU AI Act Art. 5(1)(f) prohibition; Annex III; Art. 50(3); amended in 2026                                                      | Regulation (EU) 2024/1689; secondary sources on the 2026 Digital Omnibus. Final wording to be checked against the consolidated text before the README is final |
+| Claim                                                                                                                                                            | Source (checked 2026-11-15)                                                                                                                                    |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MediaPipe 1.x metrics POST to `odml.pa.googleapis.com/v1/log` every 60 s, no option to disable; stops after first failed send                                    | `@mediapipe/tasks-vision@1.2.3` `vision_bundle.mjs` + README "Privacy Notice" (last modified 2026-06-05); absent in `0.10.35`, present since `1.0.0`           |
+| FaceLandmarker options, `detectForVideo`, result types, blendshape mirroring note, `useModule` loader, module-worker fallback                                    | `@mediapipe/tasks-vision@1.2.3` `vision.d.ts` and bundle                                                                                                       |
+| jsPsych extension interface                                                                                                                                      | `jspsych@8.4.0` `dist/index.d.ts`                                                                                                                              |
+| rVFC support (Chrome 83, Safari 15.4, Firefox 132); `captureTime` optional/WebRTC-oriented                                                                       | web.dev rVFC article; MDN; Mozilla bug 1908245                                                                                                                 |
+| `performance.now()` coarsening (Chrome 100 µs / 5 µs isolated; Firefox, Safari ~1 ms)                                                                            | Chrome developer blog "Aligning timers with cross origin isolation restrictions"; MDN `Performance.now()`                                                      |
+| `getCoalescedEvents` in Safari 18.2+                                                                                                                             | MDN compat data; WebKit bug 210454                                                                                                                             |
+| Chrome fake capture accepts `.y4m` and `.mjpeg`                                                                                                                  | Chromium `media_switches.cc`; WebdriverIO camera service docs                                                                                                  |
+| typescript-eslint peer `typescript >=4.8.4 <6.1.0`; TS 7.0 stable, 7.1 beta                                                                                      | `npm view typescript-eslint@8.72.2 peerDependencies`; npm dist-tags; TypeScript 7.0 announcement                                                               |
+| Vitest 5 requires Node ^22.12/^24 and Vite (non-optional peer)                                                                                                   | `npm view vitest@5.1.0 engines peerDependencies peerDependenciesMeta`                                                                                          |
+| pandas 3.1 requires Python ≥ 3.11; numpy 2.5 ≥ 3.12                                                                                                              | PyPI JSON API                                                                                                                                                  |
+| Unloading a document force-closes its IndexedDB connections, aborting unfinished transactions                                                                    | IndexedDB 3.0 "close a database connection" (forced flag); reproduced by the M1 e2e test before the spill fix                                                  |
+| fflate builds zip DOS timestamps from `new Date(mtime ?? Date.now())` with local-time getters                                                                    | `fflate@0.8.3` `esm/browser.js` (`getFullYear() - 1980` …)                                                                                                     |
+| Vitest 5 browser mode: `browser: { enabled, provider: playwright(), instances }`, `test.projects`; `vitest/browser` `userEvent`                                  | `vitest@5.1.0` and `@vitest/browser@5.1.0` type definitions; Playwright 1.65.1 browsers (Chromium 159, Firefox 159, WebKit 27.2)                               |
+| pandas reads `0`/`1` into nullable `boolean` via `Int64`; `keep_default_na=False, na_values=['']` keeps `"NA"` a string                                          | pandas 3.1.1, exercised by `python/mmstudykit/tests`                                                                                                           |
+| MediaPipe 1.2.3 and 1.2.4-rc.20261114 still create the metrics logger unconditionally; `enableLogging` exists only in the .d.ts; transport is global `fetch`     | `npm pack` of both versions; `vision_bundle.mjs` (`new Nh` → `new xh`, `vh.send` uses `fetch`)                                                                 |
+| Module workers need the `useModule` wasm (`ModuleFactory not set` otherwise); rVFC fires for detached `<video>`; WebKit reports `captureTime` for canvas streams | Worker spike, Playwright 1.65.1: Chromium 159, Firefox 159, WebKit 27.2 ([docs/face-worker.md](docs/face-worker.md))                                           |
+| Chrome's fake capture plays concatenated-JPEG MJPEG at 30 fps at the file's resolution, with rVFC `captureTime` on every frame                                   | Probe with `--use-file-for-fake-video-capture` (Chromium 159)                                                                                                  |
+| `@mediapipe/tasks-vision` ships no LICENSE file (only `"license": "Apache-2.0"`) and its `exports` hides `package.json`                                          | Package contents and `package.json` of 1.2.3                                                                                                                   |
+| FaceLandmarker model float16/1: SHA-256 `64184e22…c9ff`, 3,758,596 bytes, unchanged since at least 2026-07                                                       | Download on 2026-11-15 matches the maintainer's July copy                                                                                                      |
+| Vite lists public files at server start (assets created later return 404)                                                                                        | Reproduced with the face browser tests; fixed by preparing assets before Vitest starts                                                                         |
+| EU AI Act Art. 5(1)(f) prohibition; Annex III; Art. 50(3); amended in 2026                                                                                       | Regulation (EU) 2024/1689; secondary sources on the 2026 Digital Omnibus. Final wording to be checked against the consolidated text before the README is final |

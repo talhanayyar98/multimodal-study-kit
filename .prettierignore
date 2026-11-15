@@ -7,3 +7,8 @@ pnpm-lock.yaml
 python/
 spec/fixtures/**/*.csv
 spec/fixtures/**/*.jsonl
+**/spike/public/
+**/spike/results.json
+**/.test-assets/
+**/.e2e-site/
+**/e2e/fixtures/
