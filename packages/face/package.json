@@ -1,0 +1,47 @@
+{
+  "name": "@mmstudykit/face",
+  "version": "0.0.0",
+  "description": "Webcam face features (MediaPipe Face Landmarker) for multimodal-study-kit. Video never leaves the device.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/build-assets.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node scripts/prepare-test-assets.mjs && vitest run",
+    "spike": "node spike/run.mjs",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@mmstudykit/core": "workspace:^"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "catalog:"
+  },
+  "devDependencies": {
+    "@mmstudykit/core": "workspace:*",
+    "@mmstudykit/sensors": "workspace:*",
+    "@types/node": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "ajv": "catalog:",
+    "esbuild": "catalog:",
+    "fflate": "catalog:",
+    "playwright": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "bin": {
+    "mmstudykit-face": "./dist/cli.js"
+  }
+}

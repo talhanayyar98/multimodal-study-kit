@@ -7,10 +7,13 @@ packages:
 # Versions checked against the npm registry on 2026-11-15 (see PLAN.md §10).
 catalog:
   '@eslint/js': 10.0.1
+  # Exact pin: the metrics-blocking audit (PLAN.md §0.1, Q3) applies to this build. Re-audit on bump.
+  '@mediapipe/tasks-vision': 1.2.3
   '@types/node': 24.19.2
   '@vitest/browser-playwright': 5.1.0
   ajv: 8.20.0
   eslint: 10.15.0
+  esbuild: 0.28.2
   eslint-config-prettier: 10.1.8
   fflate: 0.8.3
   playwright: 1.65.1
