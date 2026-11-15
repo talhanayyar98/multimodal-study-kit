@@ -1,0 +1,113 @@
+{
+  "$schema": "../../manifest.schema.json",
+  "format": "mmstudykit.session",
+  "schemaVersion": "0.1.0",
+  "toolkit": {
+    "name": "multimodal-study-kit",
+    "version": "0.0.0",
+    "packages": {
+      "@mmstudykit/core": "0.0.0",
+      "@mmstudykit/sensors": "0.0.0",
+      "@mmstudykit/face": "0.0.0"
+    }
+  },
+  "study": {
+    "id": "fixture-study",
+    "version": "1"
+  },
+  "session": {
+    "id": "s-0002",
+    "participantId": "P002",
+    "status": "withdrawn",
+    "startedAt": "2026-11-15T10:00:00.000Z",
+    "endedAt": "2026-11-15T10:00:03.000Z",
+    "durationMs": 3000,
+    "pauses": []
+  },
+  "clock": {
+    "timebase": "session",
+    "unit": "ms",
+    "crossOriginIsolated": false,
+    "measuredResolutionMs": 0.1,
+    "segments": [
+      {
+        "index": 0,
+        "reason": "start",
+        "t": 0,
+        "wallClockMs": 1794736800000,
+        "timeOrigin": 1794736798500.25,
+        "perfNow": 1499.75
+      }
+    ],
+    "anchors": [
+      {
+        "segment": 0,
+        "t": 0,
+        "wallClockMs": 1794736800000,
+        "perfNow": 1499.75
+      }
+    ],
+    "discontinuities": []
+  },
+  "consent": {
+    "textVersion": "fixture-v1",
+    "textSha256": "2197ead234247b27a4130da8cfcab39310444a21d96244e2396cf5a05c8faf34",
+    "decidedAt": "2026-11-15T09:59:58.000Z",
+    "decisions": {
+      "pointer": "granted",
+      "face": "declined"
+    },
+    "options": {},
+    "withdrawal": {
+      "at": "2026-11-15T10:00:03.000Z",
+      "t": 3000
+    }
+  },
+  "environment": {
+    "browser": {
+      "name": "Chrome",
+      "majorVersion": 142
+    },
+    "os": {
+      "name": "macOS"
+    },
+    "deviceClass": "desktop",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "devicePixelRatio": 2
+    },
+    "persistence": "indexeddb"
+  },
+  "privacy": {
+    "rawVideoPersisted": false,
+    "rawVideoTransmitted": false,
+    "keyIdentityRecorded": false,
+    "faceLandmarksRecorded": "none",
+    "participantIdSource": "researcher"
+  },
+  "sensors": [
+    {
+      "id": "pointer",
+      "package": "@mmstudykit/sensors",
+      "version": "0.0.0",
+      "enabled": true,
+      "config": {
+        "coalesced": true,
+        "aoi": true
+      }
+    },
+    {
+      "id": "face",
+      "package": "@mmstudykit/face",
+      "version": "0.0.0",
+      "enabled": false,
+      "config": {
+        "features": ["blendshapes", "headPose"],
+        "fps": 15
+      },
+      "notes": ["not started: consent declined"]
+    }
+  ],
+  "streams": []
+}

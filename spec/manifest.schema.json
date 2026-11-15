@@ -1,0 +1,706 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mmstudykit:schema:manifest:0.1.0",
+  "title": "multimodal-study-kit session manifest",
+  "description": "Self-describing metadata for one exported session bundle. Draft v0.1.0: may change in breaking ways until 1.0.0. Writers must produce documents that validate strictly; readers should accept any manifest with a supported major schemaVersion and ignore unknown fields.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schemaVersion",
+    "toolkit",
+    "study",
+    "session",
+    "clock",
+    "consent",
+    "environment",
+    "privacy",
+    "sensors",
+    "streams"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "format": {
+      "const": "mmstudykit.session"
+    },
+    "schemaVersion": {
+      "$ref": "#/$defs/semver"
+    },
+    "toolkit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "packages"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "$ref": "#/$defs/semver"
+        },
+        "packages": {
+          "description": "npm package name -> version, for every toolkit package that took part in the session.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/semver"
+          }
+        }
+      }
+    },
+    "study": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 64
+        }
+      }
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "participantId", "status", "startedAt", "endedAt", "durationMs", "pauses"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "participantId": {
+          "description": "Researcher-provided pseudonymous identifier. The toolkit never derives or collects it automatically.",
+          "$ref": "#/$defs/identifier"
+        },
+        "status": {
+          "description": "completed: ended normally. incomplete: exported before end (e.g. crash recovery). withdrawn: participant withdrew; streams are deleted and the bundle contains only this manifest.",
+          "enum": ["completed", "incomplete", "withdrawn"]
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endedAt": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "durationMs": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "pauses": {
+          "description": "Participant- or researcher-initiated pauses. Sensors record nothing while paused.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["startT", "endT"],
+            "properties": {
+              "startT": {
+                "$ref": "#/$defs/sessionMs"
+              },
+              "endT": {
+                "type": ["number", "null"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "clock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timebase",
+        "unit",
+        "crossOriginIsolated",
+        "measuredResolutionMs",
+        "segments",
+        "anchors",
+        "discontinuities"
+      ],
+      "properties": {
+        "timebase": {
+          "description": "Every t in every stream is milliseconds since session start on the session's monotonic clock.",
+          "const": "session"
+        },
+        "unit": {
+          "const": "ms"
+        },
+        "crossOriginIsolated": {
+          "description": "Whether the page was cross-origin isolated (affects performance.now() resolution).",
+          "type": "boolean"
+        },
+        "measuredResolutionMs": {
+          "description": "Smallest non-zero performance.now() increment observed at session start, or null if not measured.",
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "segments": {
+          "description": "One segment per page load. A reload with resume starts a new segment whose start t is derived from the wall clock (lower accuracy).",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/clockSegment"
+          }
+        },
+        "anchors": {
+          "description": "Periodic pairs of session time and wall-clock time, for drift analysis and alignment with external systems.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/clockAnchor"
+          }
+        },
+        "discontinuities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/clockDiscontinuity"
+          }
+        }
+      }
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["textVersion", "textSha256", "decidedAt", "decisions", "options", "withdrawal"],
+      "properties": {
+        "textVersion": {
+          "description": "Researcher-provided version label of the consent text shown (e.g. the ethics approval reference).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "textSha256": {
+          "description": "SHA-256 (lowercase hex) of the exact consent text shown, or null if the researcher did not pass the text.",
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "decidedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "decisions": {
+          "description": "Sensor id -> decision. Sensors without a 'granted' decision never start.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/decision"
+          }
+        },
+        "options": {
+          "description": "Privacy-relevant opt-ins shown to the participant, keyed '<sensorId>.<option>' (e.g. 'keyboard.keyIdentity').",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/decision"
+          }
+        },
+        "withdrawal": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["at", "t"],
+              "properties": {
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "t": {
+                  "$ref": "#/$defs/sessionMs"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "environment": {
+      "description": "Deliberately coarse. No device labels or IDs, no fingerprinting signals, no timezone or language.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["browser", "os", "deviceClass", "viewport", "persistence"],
+      "properties": {
+        "browser": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "majorVersion"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 32
+            },
+            "majorVersion": {
+              "type": ["integer", "null"]
+            }
+          }
+        },
+        "os": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 32
+            }
+          }
+        },
+        "deviceClass": {
+          "enum": ["desktop", "mobile", "tablet", "unknown"]
+        },
+        "viewport": {
+          "description": "Viewport at session start (CSS px). Needed to interpret pointer coordinates; changes are in page.events.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height", "devicePixelRatio"],
+          "properties": {
+            "width": {
+              "type": "number",
+              "minimum": 0
+            },
+            "height": {
+              "type": "number",
+              "minimum": 0
+            },
+            "devicePixelRatio": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "persistence": {
+          "description": "Where buffered data lived during the session.",
+          "enum": ["indexeddb", "memory"]
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rawVideoPersisted",
+        "rawVideoTransmitted",
+        "keyIdentityRecorded",
+        "faceLandmarksRecorded",
+        "participantIdSource"
+      ],
+      "properties": {
+        "rawVideoPersisted": {
+          "const": false
+        },
+        "rawVideoTransmitted": {
+          "const": false
+        },
+        "keyIdentityRecorded": {
+          "type": "boolean"
+        },
+        "faceLandmarksRecorded": {
+          "enum": ["none", "subset", "full"]
+        },
+        "participantIdSource": {
+          "const": "researcher"
+        }
+      }
+    },
+    "sensors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sensor"
+      }
+    },
+    "streams": {
+      "description": "Empty when session.status is 'withdrawn'.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/stream"
+      }
+    },
+    "quality": {
+      "description": "Sensor id -> sensor-specific quality summary (e.g. face: effective fps, face-present ratio).",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object"
+      }
+    },
+    "extensions": {
+      "description": "Namespaced third-party data (keys like 'org.example.gaze'). Readers must ignore what they do not understand.",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)+$"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "withdrawn"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "streams": {
+            "type": "array",
+            "maxItems": 0
+          },
+          "consent": {
+            "type": "object",
+            "properties": {
+              "withdrawal": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "sessionMs": {
+      "description": "Milliseconds on the session clock.",
+      "type": "number"
+    },
+    "decision": {
+      "enum": ["granted", "declined"]
+    },
+    "clockSegment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index", "reason", "t", "wallClockMs", "timeOrigin", "perfNow"],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reason": {
+          "enum": ["start", "reload-resume"]
+        },
+        "t": {
+          "description": "Session time at which this segment starts.",
+          "$ref": "#/$defs/sessionMs"
+        },
+        "wallClockMs": {
+          "description": "Date.now() at segment start (Unix ms).",
+          "type": "number"
+        },
+        "timeOrigin": {
+          "description": "performance.timeOrigin of this page load (Unix ms).",
+          "type": "number"
+        },
+        "perfNow": {
+          "description": "performance.now() at segment start.",
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "clockAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["segment", "t", "wallClockMs", "perfNow"],
+      "properties": {
+        "segment": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "t": {
+          "$ref": "#/$defs/sessionMs"
+        },
+        "wallClockMs": {
+          "type": "number"
+        },
+        "perfNow": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "clockDiscontinuity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["t", "kind", "magnitudeMs"],
+      "properties": {
+        "t": {
+          "$ref": "#/$defs/sessionMs"
+        },
+        "kind": {
+          "description": "suspend: monotonic and wall clock diverged (sleep, tab freeze). wallclock-jump: system time changed. reload-gap: time between page loads of a resumed session.",
+          "enum": ["suspend", "wallclock-jump", "reload-gap"]
+        },
+        "magnitudeMs": {
+          "type": "number"
+        }
+      }
+    },
+    "sensor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "package", "version", "enabled", "config"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "package": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "$ref": "#/$defs/semver"
+        },
+        "enabled": {
+          "description": "True only if consent was granted and the sensor started.",
+          "type": "boolean"
+        },
+        "config": {
+          "description": "The sensor's resolved configuration (defaults applied).",
+          "type": "object"
+        },
+        "notes": {
+          "description": "Runtime facts worth knowing (e.g. 'worker+GPU', 'getCoalescedEvents unavailable').",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        }
+      }
+    },
+    "stream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "sensor",
+        "kind",
+        "format",
+        "file",
+        "nominalRateHz",
+        "timestampSource",
+        "columns",
+        "stats"
+      ],
+      "properties": {
+        "name": {
+          "description": "<sensor>.<stream>, snake_case segments.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+        },
+        "sensor": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "kind": {
+          "description": "samples: (mostly) regular numeric series. events: irregular occurrences.",
+          "enum": ["samples", "events"]
+        },
+        "format": {
+          "enum": ["csv", "jsonl"]
+        },
+        "file": {
+          "description": "Path inside the bundle.",
+          "type": "string",
+          "pattern": "^streams/[a-z][a-z0-9_.]*\\.(csv|jsonl)$"
+        },
+        "nominalRateHz": {
+          "type": ["number", "null"],
+          "exclusiveMinimum": 0
+        },
+        "timestampSource": {
+          "description": "How t was obtained, e.g. 'event.timeStamp', 'rvfc.captureTime', 'rvfc.presentationTime', 'performance.now', 'raf'.",
+          "type": "string",
+          "minLength": 1
+        },
+        "columns": {
+          "description": "CSV columns in file order, or top-level JSONL keys. The first is always t.",
+          "type": "array",
+          "minItems": 1,
+          "allOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/column"
+              }
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "const": "t"
+                    },
+                    "type": {
+                      "const": "number"
+                    },
+                    "unit": {
+                      "const": "ms"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "stats": {
+          "$ref": "#/$defs/streamStats"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "format": {
+                "const": "csv"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "columns": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "not": {
+                        "const": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type", "unit", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "type": {
+          "description": "boolean is encoded 0/1 in CSV. object is allowed only in JSONL streams.",
+          "enum": ["number", "integer", "boolean", "string", "enum", "object"]
+        },
+        "unit": {
+          "description": "Unit of measure (e.g. 'ms', 'px', 'deg', 'cm', '1' for dimensionless), or null for non-quantities.",
+          "type": ["string", "null"]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "enumValues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "precision": {
+          "description": "Decimal places written for this column, if fixed.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        }
+      },
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "enum"
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "enumValues": {
+            "type": "array"
+          }
+        },
+        "required": ["enumValues"]
+      }
+    },
+    "streamStats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "firstT", "lastT", "intervalMs"],
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "firstT": {
+          "type": ["number", "null"]
+        },
+        "lastT": {
+          "type": ["number", "null"]
+        },
+        "intervalMs": {
+          "description": "Inter-sample interval summary, or null for fewer than two samples or for event streams.",
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mean", "sd", "p50", "p95", "max"],
+              "properties": {
+                "mean": {
+                  "type": "number"
+                },
+                "sd": {
+                  "type": "number"
+                },
+                "p50": {
+                  "type": "number"
+                },
+                "p95": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

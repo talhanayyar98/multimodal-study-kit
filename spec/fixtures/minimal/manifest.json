@@ -1,0 +1,181 @@
+{
+  "$schema": "../../manifest.schema.json",
+  "format": "mmstudykit.session",
+  "schemaVersion": "0.1.0",
+  "toolkit": {
+    "name": "multimodal-study-kit",
+    "version": "0.0.0",
+    "packages": {
+      "@mmstudykit/core": "0.0.0",
+      "@mmstudykit/sensors": "0.0.0",
+      "@mmstudykit/face": "0.0.0"
+    }
+  },
+  "study": { "id": "fixture-study", "version": "1" },
+  "session": {
+    "id": "s-0001",
+    "participantId": "P001",
+    "status": "completed",
+    "startedAt": "2026-11-15T10:00:00.000Z",
+    "endedAt": "2026-11-15T10:00:05.000Z",
+    "durationMs": 5000,
+    "pauses": []
+  },
+  "clock": {
+    "timebase": "session",
+    "unit": "ms",
+    "crossOriginIsolated": false,
+    "measuredResolutionMs": 0.1,
+    "segments": [
+      {
+        "index": 0,
+        "reason": "start",
+        "t": 0,
+        "wallClockMs": 1794736800000,
+        "timeOrigin": 1794736798500.25,
+        "perfNow": 1499.75
+      }
+    ],
+    "anchors": [
+      { "segment": 0, "t": 0, "wallClockMs": 1794736800000, "perfNow": 1499.75 },
+      { "segment": 0, "t": 5000, "wallClockMs": 1794736805000, "perfNow": 6499.75 }
+    ],
+    "discontinuities": []
+  },
+  "consent": {
+    "textVersion": "fixture-v1",
+    "textSha256": "2197ead234247b27a4130da8cfcab39310444a21d96244e2396cf5a05c8faf34",
+    "decidedAt": "2026-11-15T09:59:58.000Z",
+    "decisions": { "pointer": "granted", "face": "declined" },
+    "options": {},
+    "withdrawal": null
+  },
+  "environment": {
+    "browser": { "name": "Chrome", "majorVersion": 142 },
+    "os": { "name": "macOS" },
+    "deviceClass": "desktop",
+    "viewport": { "width": 1280, "height": 800, "devicePixelRatio": 2 },
+    "persistence": "indexeddb"
+  },
+  "privacy": {
+    "rawVideoPersisted": false,
+    "rawVideoTransmitted": false,
+    "keyIdentityRecorded": false,
+    "faceLandmarksRecorded": "none",
+    "participantIdSource": "researcher"
+  },
+  "sensors": [
+    {
+      "id": "pointer",
+      "package": "@mmstudykit/sensors",
+      "version": "0.0.0",
+      "enabled": true,
+      "config": { "coalesced": true, "aoi": true }
+    },
+    {
+      "id": "face",
+      "package": "@mmstudykit/face",
+      "version": "0.0.0",
+      "enabled": false,
+      "config": { "features": ["blendshapes", "headPose"], "fps": 15 },
+      "notes": ["not started: consent declined"]
+    }
+  ],
+  "streams": [
+    {
+      "name": "pointer.move",
+      "sensor": "pointer",
+      "kind": "samples",
+      "format": "csv",
+      "file": "streams/pointer.move.csv",
+      "nominalRateHz": null,
+      "timestampSource": "event.timeStamp",
+      "columns": [
+        {
+          "name": "t",
+          "type": "number",
+          "unit": "ms",
+          "description": "Session time.",
+          "precision": 3
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "unit": "px",
+          "description": "Pointer x in CSS px, viewport-relative (clientX).",
+          "precision": 1
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "unit": "px",
+          "description": "Pointer y in CSS px, viewport-relative (clientY).",
+          "precision": 1
+        },
+        {
+          "name": "pointer_type",
+          "type": "enum",
+          "unit": null,
+          "description": "PointerEvent.pointerType.",
+          "enumValues": ["mouse", "pen", "touch"]
+        },
+        {
+          "name": "pointer_id",
+          "type": "integer",
+          "unit": null,
+          "description": "PointerEvent.pointerId (distinguishes simultaneous touches)."
+        },
+        {
+          "name": "buttons",
+          "type": "integer",
+          "unit": null,
+          "description": "Bitmask of pressed buttons (PointerEvent.buttons)."
+        },
+        {
+          "name": "coalesced",
+          "type": "boolean",
+          "unit": null,
+          "description": "1 if the sample came from getCoalescedEvents(), 0 if it was the dispatched event."
+        }
+      ],
+      "stats": {
+        "count": 6,
+        "firstT": 1000,
+        "lastT": 1082.5,
+        "intervalMs": { "mean": 16.5, "sd": 0, "p50": 16.5, "p95": 16.5, "max": 16.5 }
+      }
+    },
+    {
+      "name": "task.markers",
+      "sensor": "task",
+      "kind": "events",
+      "format": "jsonl",
+      "file": "streams/task.markers.jsonl",
+      "nominalRateHz": null,
+      "timestampSource": "per-row (see source)",
+      "columns": [
+        { "name": "t", "type": "number", "unit": "ms", "description": "Session time." },
+        {
+          "name": "name",
+          "type": "string",
+          "unit": null,
+          "description": "Researcher-chosen marker name."
+        },
+        {
+          "name": "source",
+          "type": "enum",
+          "unit": null,
+          "description": "api: performance.now() at mark(). frame: requestAnimationFrame time (markOnNextFrame). jspsych: jsPsych extension.",
+          "enumValues": ["api", "frame", "jspsych"]
+        },
+        {
+          "name": "data",
+          "type": "object",
+          "unit": null,
+          "description": "Researcher-provided payload."
+        }
+      ],
+      "stats": { "count": 2, "firstT": 980.25, "lastT": 4210.9, "intervalMs": null }
+    }
+  ]
+}

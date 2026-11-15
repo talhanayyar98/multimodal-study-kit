@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.mjpeg binary
+*.y4m binary
+*.task binary
+*.wasm binary

@@ -1,0 +1,9 @@
+pnpm-lock.yaml
+**/dist/
+**/coverage/
+**/.turbo/
+**/.next/
+**/out/
+python/
+spec/fixtures/**/*.csv
+spec/fixtures/**/*.jsonl

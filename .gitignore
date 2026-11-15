@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+.next/
+*.tsbuildinfo
+
+# Tooling caches
+.turbo/
+coverage/
+.eslintcache
+
+# Test artifacts
+playwright-report/
+test-results/
+blob-report/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+build/
+
+# Exported participant data must never be committed by accident
+session_*/
+session_*.zip
+!spec/fixtures/**
+
+# OS / editor
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
