@@ -5,7 +5,7 @@
 Add webcam face features, pointer movement, keystroke timing, page events and task markers to any web study in a few lines. Everything is recorded on one shared clock and exported as a documented bundle that loads into Python or R in one line.
 
 > [!WARNING]
-> **Pre-alpha, M0 of 5.** The repository currently contains the scaffold, the [plan](PLAN.md) and the draft [export format](spec/). The quickstart below shows the **target API**. It is not implemented yet, and this README will be kept in sync with what actually works as each milestone lands.
+> **Pre-alpha, M1 of 5.** Core, the pointer/keyboard/page sensors, the zip export and the Python loader work and are tested on Chromium, Firefox and WebKit. The face sensor arrives in M2, React bindings in M3. Nothing is published to npm or PyPI yet. The quickstart below is kept true to the code.
 
 ## Why
 
@@ -14,57 +14,60 @@ Add webcam face features, pointer movement, keystroke timing, page events and ta
 - **Clean, self-describing exports.** CSV/JSONL streams plus a versioned `manifest.json` (JSON Schema in [`spec/`](spec/)) with the consent record, clock anchors, sensor configs and per-stream statistics.
 - **Features, not inferences.** The toolkit outputs behavioral features (head pose, blendshape scores, pointer trajectories, keystroke timing). It does **not** infer emotions, engagement or cognitive states. That is a deliberate design and ethics decision ([see below](#ethics-privacy-and-the-law)).
 
-## Quickstart _(target API, not implemented yet)_
+## Quickstart
 
 ```ts
 import { createSession, downloadSink } from '@mmstudykit/core';
+import { keyboard } from '@mmstudykit/sensors/keyboard';
 import { page } from '@mmstudykit/sensors/page';
 import { pointer } from '@mmstudykit/sensors/pointer';
-import { keyboard } from '@mmstudykit/sensors/keyboard';
-import { face } from '@mmstudykit/face';
 
 const session = await createSession({
   studyId: 'reading-pilot',
   participantId: 'P017', // pseudonymous, provided by you, never collected automatically
   sensors: [
     page(),
-    pointer(),
+    pointer(), // + enter/leave of elements you tag with data-mmsk-aoi="…"
     keyboard(), // timing + key category only
-    face({ features: ['blendshapes', 'headPose'], fps: 15 }),
   ],
   sinks: [downloadSink()],
 });
 
-// Show session.describe() in your consent form, then record the participant's choices:
+// Show session.describe() in your consent form, then record the participant's choices.
+// Sensors that aren't granted never start.
 await session.consent({
   textVersion: 'ethics-v3',
-  granted: ['page', 'pointer', 'keyboard', 'face'],
+  granted: ['page', 'pointer', 'keyboard'],
 });
 await session.start();
 
-await session.markOnNextFrame('stimulus_onset', { itemId: 3 });
+await session.markOnNextFrame('stimulus_onset', { itemId: 3 }); // right after you render it
 // … your task …
 await session.end(); // downloads session_<id>.zip
 ```
 
+If the page reloads mid-session, `createSession()` returns the same session with `resumed: true`.
+Call `start()` again and it continues in a new clock segment. [`examples/vanilla`](examples/vanilla)
+is a complete study page that handles this.
+
 ```python
 from mmstudykit import load_session
 s = load_session("session_abc123.zip")
-s.streams["face.headpose"]                                    # pandas DataFrame, t = session ms
-s.epochs(marker="stimulus_onset", window=(-500, 3000))
+s.streams["pointer.move"]                                     # pandas DataFrame, t = session ms
+s.markers                                                     # task.markers
 ```
 
-React bindings (`<ConsentGate>`, `<CameraCheck>`, `<SensorStatus>`) and a jsPsych 8 extension are planned. See [PLAN.md §3](PLAN.md#3-public-api-sketch).
+Planned: the `face` sensor (M2), React bindings (`<ConsentGate>`, `<CameraCheck>`, `<SensorStatus>`, M3), a jsPsych 8 extension and Python `align`/`epochs` (M4). See [PLAN.md §3](PLAN.md#3-public-api-sketch).
 
 ## What gets recorded, and what never is
 
-| Sensor     | Records (defaults)                                                                                                | Never recorded                                                                          | Opt-in                                     |
-| ---------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------ |
-| `face`     | Head pose, 52 blendshape scores, iris features, face-present flag, quality metrics (fps, brightness)              | Video frames or images, in any form                                                     | Landmarks (subset or full mesh)            |
-| `keyboard` | Key down/up times and coarse category (letter, digit, space, backspace, enter, modifier, other)                   | Which key was pressed or what was typed; anything in password fields                    | Key identity (must appear in consent text) |
-| `pointer`  | Position, buttons, pointer type, enter/leave of elements you tag as areas of interest                             | Text or content of the elements under the pointer                                       |                                            |
-| `page`     | Visibility, focus/blur, viewport size, scroll, fullscreen, page lifecycle                                         | URLs or page content                                                                    |                                            |
-| _session_  | Consent record (text version + hash, per-sensor decisions), pauses, clock anchors, coarse browser/OS/device class | Device or camera labels and IDs, fingerprinting signals, IP address, timezone, language |                                            |
+| Sensor        | Records (defaults)                                                                                                                                   | Never recorded                                                                              | Opt-in                                     |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `face` _(M2)_ | Head pose, 52 blendshape scores, iris features, face-present flag, quality metrics (fps, brightness)                                                 | Video frames or images, in any form                                                         | Landmarks (subset or full mesh)            |
+| `keyboard`    | Key down/up times and a coarse category (letter, digit, punctuation, space, Enter, Tab, Backspace, Delete, navigation, modifier, composition, other) | Which key was pressed or what was typed; anything in password, one-time-code or card fields | Key identity (must appear in consent text) |
+| `pointer`     | Position (incl. coalesced samples), buttons, pointer type, enter/leave and geometry of elements you tag as areas of interest                         | Text or content of the elements under the pointer                                           |                                            |
+| `page`        | Visibility, focus/blur, viewport size and zoom, scroll (window and tagged containers), fullscreen, page lifecycle                                    | URLs, titles or page content                                                                |                                            |
+| _session_     | Consent record (text version + hash, per-sensor decisions), pauses, clock anchors, coarse browser/OS/device class                                    | Device or camera labels and IDs, fingerprinting signals, IP address, timezone, language     |                                            |
 
 ## Ethics, privacy and the law
 
@@ -83,8 +86,8 @@ React bindings (`<ConsentGate>`, `<CameraCheck>`, `<SensorStatus>`) and a jsPsyc
 | Milestone                                                   | Status  |
 | ----------------------------------------------------------- | ------- |
 | M0: Scaffold, plan, format schema v0                        | ✅ done |
-| M1: Core, pointer/keyboard/page sensors, export             | next    |
-| M2: Face sensor, fake-camera e2e, privacy test              |         |
+| M1: Core, pointer/keyboard/page sensors, export             | ✅ done |
+| M2: Face sensor, fake-camera e2e, privacy test              | next    |
 | M3: Consent UI, React, demo study, upload sink              |         |
 | M4: jsPsych extension, Python align/epochs, researcher view |         |
 | M5: Docs site, benchmarks, release v0.1.0                   |         |
@@ -92,29 +95,35 @@ React bindings (`<ConsentGate>`, `<CameraCheck>`, `<SensorStatus>`) and a jsPsyc
 ## Repository layout
 
 ```
-packages/core       @mmstudykit/core: session, clock, streams, recorder, export (skeleton)
+packages/core       @mmstudykit/core: session, clock, consent, streams, recorder, export, sinks
+packages/sensors    @mmstudykit/sensors: pointer, keyboard, page (subpath exports)
+examples/vanilla    a complete study page without a framework, plus its end-to-end test
 spec/               bundle format: manifest JSON Schema, conventions, shared test fixtures
-python/mmstudykit   Python loader (skeleton)
+python/mmstudykit   Python loader (load_session)
 PLAN.md             architecture, API, milestones, risks, open questions
 ```
 
-More packages (`sensors`, `face`, `react`, `jspsych`) and apps (`demo`, `receiver`) arrive with their milestones.
+More packages (`face`, `react`, `jspsych`) and apps (`demo`, `receiver`) arrive with their milestones.
 
 ## Development
 
-Requires Node 24 (see `.nvmrc`) and pnpm 12 (`corepack enable pnpm`).
+Requires Node 24 (see `.nvmrc`) and pnpm 12 (`corepack enable pnpm`). Browser tests use Playwright's browsers.
 
 ```sh
 pnpm install
-pnpm check          # format, lint, typecheck, build, unit tests
+pnpm --filter @mmstudykit/core exec playwright install chromium firefox webkit   # once
+pnpm check          # format, lint, typecheck, build, unit + browser tests (Chromium, Firefox, WebKit)
 
 cd python/mmstudykit
 python3 -m venv .venv && . .venv/bin/activate
-pip install -e ".[dev]" && pytest
+pip install -e ".[dev]" && mypy && pytest
+cd ../..
+
+pnpm roundtrip      # TypeScript writes bundles (incl. a real e2e session), Python reads them back
 ```
 
 Turborepo collects anonymous usage telemetry by default. CI disables it, and you can too with `turbo telemetry disable` or `TURBO_TELEMETRY_DISABLED=1`.
 
 ## License
 
-[Apache-2.0](LICENSE) _(provisional, see [PLAN.md Q2](PLAN.md#12-open-questions))_.
+[Apache-2.0](LICENSE)

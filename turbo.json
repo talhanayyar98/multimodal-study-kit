@@ -12,7 +12,7 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "../../spec/**"],
+      "inputs": ["$TURBO_DEFAULT$", "../../spec/**", "../../packages/core/test/**"],
       "outputs": []
     },
     "clean": {

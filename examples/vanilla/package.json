@@ -1,0 +1,29 @@
+{
+  "name": "@mmstudykit/example-vanilla",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Plain HTML + TypeScript study using @mmstudykit/core and @mmstudykit/sensors.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@mmstudykit/core": "workspace:*",
+    "@mmstudykit/sensors": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "ajv": "catalog:",
+    "fflate": "catalog:",
+    "playwright": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

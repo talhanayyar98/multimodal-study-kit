@@ -1,15 +1,19 @@
 packages:
   - packages/*
   - apps/*
+  - examples/*
 
 # One place for tool and shared dependency versions; packages reference them as "catalog:".
 # Versions checked against the npm registry on 2026-11-15 (see PLAN.md §10).
 catalog:
   '@eslint/js': 10.0.1
   '@types/node': 24.19.2
+  '@vitest/browser-playwright': 5.1.0
   ajv: 8.20.0
   eslint: 10.15.0
   eslint-config-prettier: 10.1.8
+  fflate: 0.8.3
+  playwright: 1.65.1
   prettier: 3.10.1
   turbo: 2.11.11
   # Pinned to 6.0.x: typescript-eslint 8.72 supports typescript <6.1.0 (TS 7 not yet supported).

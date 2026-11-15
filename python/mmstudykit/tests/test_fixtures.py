@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -18,8 +19,9 @@ FIXTURES = Path(__file__).resolve().parents[3] / "spec" / "fixtures"
 FIXTURE_DIRS = sorted(p.parent for p in FIXTURES.glob("*/manifest.json"))
 
 
-def load_manifest(bundle: Path) -> dict:
-    return json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+def load_manifest(bundle: Path) -> dict[str, Any]:
+    manifest: dict[str, Any] = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    return manifest
 
 
 def test_fixtures_exist() -> None:

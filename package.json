@@ -17,7 +17,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test",
-    "clean": "turbo run clean && rm -rf .turbo"
+    "clean": "turbo run clean && rm -rf .turbo",
+    "roundtrip": "node scripts/roundtrip.mjs"
   },
   "devDependencies": {
     "@eslint/js": "catalog:",

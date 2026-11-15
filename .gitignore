@@ -13,6 +13,8 @@ coverage/
 .eslintcache
 
 # Test artifacts
+.vitest/
+.roundtrip/
 playwright-report/
 test-results/
 blob-report/

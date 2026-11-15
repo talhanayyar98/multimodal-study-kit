@@ -1,0 +1,49 @@
+{
+  "name": "@mmstudykit/sensors",
+  "version": "0.0.0",
+  "description": "Pointer, keyboard and page sensors for multimodal-study-kit.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./pointer": {
+      "types": "./dist/pointer.d.ts",
+      "default": "./dist/pointer.js"
+    },
+    "./keyboard": {
+      "types": "./dist/keyboard.d.ts",
+      "default": "./dist/keyboard.js"
+    },
+    "./page": {
+      "types": "./dist/page.d.ts",
+      "default": "./dist/page.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@mmstudykit/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@mmstudykit/core": "workspace:*",
+    "@types/node": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "playwright": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

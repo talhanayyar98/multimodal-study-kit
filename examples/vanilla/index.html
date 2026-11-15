@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>multimodal-study-kit · vanilla example</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, sans-serif;
+        line-height: 1.5;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 42rem;
+        padding: 1.5rem 1rem 4rem;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .disclosure {
+        border: 1px solid #8884;
+        border-radius: 0.5rem;
+        margin: 0.75rem 0;
+        padding: 0.75rem 1rem;
+      }
+      .disclosure ul {
+        margin: 0.25rem 0;
+      }
+      #passage {
+        border: 1px solid #8884;
+        border-radius: 0.5rem;
+        max-height: 9rem;
+        overflow: auto;
+        padding: 0 1rem;
+      }
+      textarea {
+        box-sizing: border-box;
+        min-height: 5rem;
+        width: 100%;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 1rem 0;
+      }
+      #status {
+        color: #888;
+        font-size: 0.875rem;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="status">Loading…</p>
+
+    <section id="consent" hidden>
+      <h1>Example study: consent</h1>
+      <p>
+        In a real study this sits inside your ethics-approved consent form. The descriptions below
+        are generated from the configured sensors by <code>session.describe()</code>. Nothing is
+        recorded until you start.
+      </p>
+      <div id="disclosure"></div>
+      <button id="agree">Agree and start</button>
+    </section>
+
+    <section id="resumed" hidden>
+      <h1>Welcome back</h1>
+      <p>The page was reloaded. Your session continues where it left off.</p>
+      <button id="continue">Continue</button>
+    </section>
+
+    <section id="task" hidden>
+      <h1>Reading task</h1>
+      <article id="passage" data-mmsk-aoi="passage" data-mmsk-scroll="passage">
+        <p>
+          Hydrothermal vents are openings in the sea floor where geothermally heated water emerges.
+          They host ecosystems that do not depend on sunlight: chemosynthetic bacteria convert
+          hydrogen sulfide into energy, and tube worms, clams and shrimp live off them.
+        </p>
+        <p>
+          The first vents were discovered in 1977 near the Galápagos Islands. Since then hundreds
+          have been found along mid-ocean ridges, at depths of up to five kilometres.
+        </p>
+        <p>
+          Some researchers think that life on Earth may have begun at vents like these, because they
+          offer energy, minerals and protection from the harsh conditions at the surface of the
+          early planet.
+        </p>
+      </article>
+
+      <div data-mmsk-aoi="question">
+        <p>What do vent ecosystems get their energy from?</p>
+        <div class="row">
+          <button data-mmsk-aoi="option_a" data-answer="A">A. Sunlight</button>
+          <button data-mmsk-aoi="option_b" data-answer="B">B. Chemicals from the vents</button>
+        </div>
+      </div>
+
+      <p><label for="notes">Notes (only typing rhythm is recorded, never the text):</label></p>
+      <textarea id="notes" data-mmsk-aoi="notes"></textarea>
+      <p>
+        <label for="password">Password (never recorded at all):</label>
+        <input id="password" type="password" />
+      </p>
+
+      <div class="row">
+        <button id="pause">Pause</button>
+        <button id="finish">Finish and download data</button>
+        <button id="withdraw">Withdraw and delete my data</button>
+      </div>
+    </section>
+
+    <section id="done" hidden>
+      <h1 id="done-title">Thank you</h1>
+      <p id="done-text"></p>
+    </section>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

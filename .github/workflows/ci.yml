@@ -19,7 +19,7 @@ env:
 
 jobs:
   js:
-    name: JS · format, lint, typecheck, build, unit
+    name: JS · format, lint, typecheck, build, unit + browser tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -29,6 +29,8 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Vitest browser mode (core, sensors) and the example e2e need real browsers.
+      - run: pnpm --filter @mmstudykit/core exec playwright install --with-deps chromium firefox webkit
       - run: pnpm run format:check
       - run: pnpm run lint
       - run: pnpm run typecheck
@@ -36,7 +38,7 @@ jobs:
       - run: pnpm run test
 
   python:
-    name: Python ${{ matrix.python }} · unit
+    name: Python ${{ matrix.python }} · mypy, unit
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -53,6 +55,28 @@ jobs:
           cache: pip
           cache-dependency-path: python/mmstudykit/pyproject.toml
       - run: python -m pip install -e ".[dev]"
+      - run: python -m mypy
       - run: python -m pytest
 
-  # e2e (Playwright, fake camera) is added in M2; browser-mode unit tests in M1.
+  roundtrip:
+    name: Round trip · TypeScript writes, Python reads
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+          cache: pip
+          cache-dependency-path: python/mmstudykit/pyproject.toml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mmstudykit/core exec playwright install --with-deps chromium
+      - run: python -m pip install -e "python/mmstudykit[dev]"
+      - run: pnpm run build
+      - run: pnpm run roundtrip
+        env:
+          PYTHON: python

@@ -22,7 +22,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "mypy>=2.4", "pandas-stubs>=2.2"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mmstudykit"]
@@ -30,3 +30,8 @@ packages = ["src/mmstudykit"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+files = ["src", "tests"]
